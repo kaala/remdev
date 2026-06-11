@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>remdev</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+<style>
+:root {
+  --bg: #0a0a0a; --fg: #c0c0c0;
+  --border: #333; --focus: #0af;
+  --title-bg: #111; --title-fg: #aaa;
+  --modal-bg: #111; --modal-overlay: rgba(0,0,0,0.8);
+  --input-bg: #000;
+  --ws-active-bg: #0af; --ws-active-fg: #000;
+  --ws-inactive-bg: #1a1a1a; --ws-inactive-fg: #666;
+}
+
+[data-theme="light"] {
+  --bg: #f0f0f0; --fg: #111;
+  --border: #ccc; --focus: #06c;
+  --title-bg: #e0e0e0; --title-fg: #111;
+  --modal-bg: #f5f5f5; --modal-overlay: rgba(0,0,0,0.3);
+  --input-bg: #fff;
+  --ws-active-bg: #06c; --ws-active-fg: #fff;
+  --ws-inactive-bg: #ddd; --ws-inactive-fg: #999;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Ubuntu Sans Mono', monospace;
+  background: var(--bg); color: var(--fg);
+  height: 100vh; display: flex; flex-direction: column;
+  overflow: hidden; font-size: 14px;
+}
+
+#status-bar {
+  display: flex; align-items: center; height: 26px; flex-shrink: 0;
+  background: var(--title-bg); color: var(--fg);
+  padding: 0 6px; gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+#status-bar .left { display: flex; gap: 1px; }
+#status-bar .center { flex: 1; }
+#status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+.bar-btn {
+  font: inherit; border: 1px solid var(--border); padding: 0 6px;
+  cursor: pointer; height: 18px; line-height: 18px;
+}
+.ws-btn { background: var(--ws-inactive-bg); color: var(--ws-inactive-fg); }
+.ws-btn.active { background: var(--ws-active-bg); color: var(--ws-active-fg); border-color: var(--focus); }
+#config-btn { background: none; color: var(--fg); }
+#config-btn:hover { background: var(--ws-inactive-bg); }
+
+#main { flex: 1; position: relative; overflow: hidden; }
+.workspace { position: absolute; inset: 0; display: none; }
+.workspace.active { display: block; }
+
+.window {
+  position: absolute; overflow: hidden;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.window.focused { border-color: var(--focus); }
+.window-title {
+  height: 22px; background: var(--title-bg); color: var(--title-fg);
+  padding: 0 6px; display: flex; align-items: center;
+  cursor: pointer; white-space: nowrap; overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.window.focused .window-title { background: var(--focus); color: #fff; }
+.window-title .title-text { overflow: hidden; text-overflow: ellipsis; }
+.window-title .dirty { color: #fa0; margin-left: 3px; }
+.window-body { position: absolute; inset: 23px 0 0 0; }
+
+.CodeMirror { height: 100%; }
+
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: var(--modal-overlay);
+  justify-content: center; align-items: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--modal-bg); border: 1px solid var(--border);
+  width: 620px; height: 440px; display: flex; flex-direction: column;
+}
+.modal-header {
+  padding: 6px 10px; font-weight: bold;
+  border-bottom: 1px solid var(--border); background: var(--title-bg);
+}
+.modal-body { display: flex; flex: 1; overflow: hidden; }
+.modal-left { width: 200px; border-right: 1px solid var(--border); overflow-y: auto; }
+.modal-right { flex: 1; display: flex; flex-direction: column; }
+.modal-right-files { flex: 1; overflow-y: auto; }
+.modal-right-bottom {
+  border-top: 1px solid var(--border); padding: 6px; display: flex;
+  flex-direction: column; gap: 4px;
+}
+.modal-right-bottom input {
+  width: 100%; padding: 3px 6px; background: var(--input-bg);
+  color: var(--fg); border: 1px solid var(--border); font: inherit;
+}
+.modal-right-bottom .btns { display: flex; gap: 4px; justify-content: flex-end; }
+.modal-right-bottom button {
+  padding: 2px 12px; border: 1px solid var(--border); cursor: pointer;
+  font: inherit; color: var(--focus); background: var(--title-bg);
+}
+.modal-right-bottom button:hover { background: var(--ws-inactive-bg); }
+
+.tree-item, .file-item {
+  padding: 2px 10px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tree-item:hover, .file-item:hover { background: var(--focus); color: #fff; }
+.tree-item.selected, .file-item.selected { background: var(--focus); color: #fff; }
+.tree-item.dir { font-weight: bold; }
+
+.toast {
+  position: fixed; top: 30px; right: 8px; z-index: 2000;
+  background: var(--modal-bg); border: 1px solid var(--focus);
+  padding: 6px 10px;
+  animation: fadeInOut 2.5s ease;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; }
+}
+</style>
+</head>
+<body data-theme="light">
+<div id="status-bar">
+  <div class="left" id="ws-buttons"></div>
+  <div class="center" id="connection-status"></div>
+  <div class="right">
+    <button id="config-btn" class="bar-btn">cfg</button>
+  </div>
+</div>
+<div id="main"></div>
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">Open File</div>
+    <div class="modal-body">
+      <div class="modal-left" id="modal-tree"></div>
+      <div class="modal-right">
+        <div class="modal-right-files" id="modal-files"></div>
+        <div class="modal-right-bottom">
+          <span>Filename:</span>
+          <input type="text" id="modal-filename">
+          <div class="btns">
+            <button id="modal-cancel">Cancel</button>
+            <button id="modal-open">Open</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/go/go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/rust/rust.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/shell/shell.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/selection/active-line.min.js"></script>
+
+<script>
+// State
+var STATE = {
+  activeWorkspace: 0,
+  theme: 'light',
+  fontFamily: 'Ubuntu Sans Mono',
+  fontSize: 14,
+  workspaces: [{windows:[],activeId:null},{windows:[],activeId:null},{windows:[],activeId:null},{windows:[],activeId:null}],
+  modalDir: '/',
+  modalSelectedDir: null,
+  modalSelectedFile: null,
+};
+var $ = function(s) { return document.querySelector(s); };
+var DAV = '/dav';
+var CFG = '/api/config';
+var CONFIG_PATH = '__rdev_config__';
+var WS_URL = (location.protocol === 'https:' ? 'https://' : 'http://') + location.host + '/ws/terminal';
+
+var LANG_MAP = {
+  js: 'javascript', ts: 'javascript', jsx: 'javascript', tsx: 'javascript',
+  json: {name:'javascript',json:true}, py: 'python', go: 'go',
+  html: 'htmlmixed', css: 'css', md: 'markdown', xml: 'xml',
+  sql: 'sql', rs: 'rust', java: 'text/x-java',
+  c: 'text/x-csrc', cpp: 'text/x-c++src', h: 'text/x-csrc', hpp: 'text/x-c++src',
+  sh: 'shell', bash: 'shell', yaml: 'yaml', yml: 'yaml',
+  toml: null, ini: null, makefile: null, dockerfile: null, txt: null,
+};
+
+function ws() { return STATE.workspaces[STATE.activeWorkspace]; }
+
+function notify(msg) {
+  var el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 2600);
+}
+
+// WebDAV
+function davGet(path, cb, errCb) {
+  fetch(DAV + path).then(function(r) { if (!r.ok) throw Error(r.statusText); return r.text(); }).then(cb).catch(errCb || function(){});
+}
+function davPut(path, body, cb, errCb) {
+  fetch(DAV + path, {method:'PUT',body:body}).then(function(r) { if (!r.ok) throw Error(r.statusText); if (cb) cb(); }).catch(errCb || function(){});
+}
+function davPropfind(path, cb, errCb) {
+  fetch(DAV + path, {method:'PROPFIND',headers:{'Depth':'1','Content-Type':'application/xml'}})
+    .then(function(r) { if (!r.ok) throw Error(r.statusText); return r.text(); })
+    .then(function(xml) { cb(parsePropfind(xml)); }).catch(errCb || function(){});
+}
+function parsePropfind(xml) {
+  var doc = new DOMParser().parseFromString(xml, 'text/xml'), items = [];
+  doc.querySelectorAll('response').forEach(function(r) {
+    var href = r.querySelector('href')?.textContent || '';
+    if (href.indexOf('/dav') === 0) href = href.slice(4) || '/';
+    var isDir = r.querySelector('resourcetype')?.querySelector('collection');
+    var name = decodeURIComponent(href.replace(/\/$/, '').split('/').pop() || '');
+    if (!name) return;
+    items.push({ name: name, path: href, isDir: !!isDir });
+  });
+  return items;
+}
+
+// Config
+function loadConfig() {
+  fetch(CFG).then(function(r) { return r.json(); }).then(function(cfg) {
+    STATE.theme = cfg.theme || 'light';
+    STATE.fontFamily = cfg.font_family || 'Ubuntu Sans Mono';
+    STATE.fontSize = cfg.font_size || 14;
+    applyTheme();
+  }).catch(function(){});
+}
+function applyTheme() {
+  document.body.dataset.theme = STATE.theme;
+  STATE.workspaces.forEach(function(wksp) {
+    wksp.windows.forEach(function(win) {
+      if (win.type === 'editor' && win.cm) {
+        win.cm.setOption('theme', STATE.theme === 'dark' ? 'material-darker' : 'default');
+      }
+    });
+  });
+}
+
+$('#config-btn').onclick = function() {
+  var cur = ws();
+  var ex = cur.windows.find(function(w) { return w.filePath === CONFIG_PATH; });
+  if (ex) { focusWindow(ex.id); return; }
+  fetch(CFG).then(function() {
+    addWindowToTiling(createWindow('editor', { filePath: CONFIG_PATH, title: 'rdev.json' }));
+  }).catch(function() { notify('Config unavailable'); });
+};
+
+// Status bar
+function renderStatusBar() {
+  var btns = $('#ws-buttons'); btns.innerHTML = '';
+  for (var i = 0; i < 4; i++) {
+    var b = document.createElement('button');
+    b.className = 'bar-btn ws-btn' + (STATE.activeWorkspace === i ? ' active' : '');
+    b.textContent = i + 1;
+    b.onclick = (function(idx) { return function() { switchWorkspace(idx); }; })(i);
+    btns.appendChild(b);
+  }
+}
+
+// Workspaces
+function initWorkspaces() {
+  for (var i = 0; i < 4; i++) {
+    var el = document.createElement('div');
+    el.className = 'workspace' + (i === 0 ? ' active' : '');
+    el.id = 'ws-' + i;
+    $('#main').appendChild(el);
+  }
+}
+function switchWorkspace(idx) {
+  if (STATE.activeWorkspace === idx) return;
+  ws().windows.forEach(function(w) { if (w.container) w.container.style.display = 'none'; });
+  STATE.activeWorkspace = idx;
+  var cur = ws();
+  cur.windows.forEach(function(w) { if (w.container) w.container.style.display = ''; });
+  cur.windows.forEach(function(w) {
+    if (w.type === 'terminal' && w.fitAddon) w.fitAddon.fit();
+    if (w.type === 'editor' && w.cm) w.cm.refresh();
+  });
+  renderStatusBar();
+  applyLayout();
+}
+
+// Tiling: binary tree
+var winCounter = 0;
+
+function createWindow(type, opts) {
+  opts = opts || {};
+  winCounter++;
+  var id = 'w' + winCounter;
+  var win = {
+    id: id, type: type,
+    filePath: opts.filePath || null, dirty: false,
+    cm: null, term: null, socket: null, fitAddon: null, uuid: null,
+    container: document.createElement('div'),
+    title: opts.title || (type === 'terminal' ? 'shell' : (opts.filePath || 'untitled')),
+  };
+  win.container.className = 'window focused'; win.container.id = id;
+  win.container.innerHTML =
+    '<div class="window-title"><span class="title-text">' + win.title + '</span><span class="dirty" style="display:none"> [modified]</span></div>' +
+    '<div class="window-body"></div>';
+  win.container.querySelector('.window-title').onclick = function() { focusWindow(id); };
+  return win;
+}
+
+function leafNode(win) { return { type: 'leaf', win: win }; }
+
+function addWindowToTiling(win) {
+  var cur = ws();
+  var rootEl = document.getElementById('ws-' + STATE.activeWorkspace);
+  rootEl.appendChild(win.container);
+  cur.windows.push(win);
+  if (!cur.tree) {
+    cur.tree = leafNode(win);
+  } else {
+    var activeLeaf = findLeafNode(cur.tree, cur.activeId) || rightmostLeaf(cur.tree);
+    splitLeaf(activeLeaf, win);
+  }
+  cur.activeId = win.id;
+  unfocusAll();
+  win.container.classList.add('focused');
+  applyLayout();
+  setTimeout(function() { initWindowContent(win); }, 30);
+}
+
+function splitLeaf(leaf, newWin) {
+  var node = leaf.node || leaf;
+  var container = node.win.container;
+  var dir = container.clientWidth >= container.clientHeight ? 'v' : 'h';
+  var split = { type: 'split', dir: dir, ratio: 50, a: leafNode(node.win), b: leafNode(newWin) };
+  replaceNodeInTree(ws().tree, node, split);
+}
+
+function replaceNodeInTree(tree, target, replacement) {
+  if (tree === target) { ws().tree = replacement; return true; }
+  if (tree.type === 'leaf') return false;
+  if (tree.a === target) { tree.a = replacement; return true; }
+  if (tree.b === target) { tree.b = replacement; return true; }
+  return replaceNodeInTree(tree.a, target, replacement) || replaceNodeInTree(tree.b, target, replacement);
+}
+
+function findLeafNode(tree, winId) {
+  if (!tree) return null;
+  if (tree.type === 'leaf') return tree.win && tree.win.id === winId ? tree : null;
+  return findLeafNode(tree.a, winId) || findLeafNode(tree.b, winId);
+}
+
+function findParentOf(tree, target) {
+  if (!tree || tree.type === 'leaf') return null;
+  if (tree.a === target || tree.b === target) return tree;
+  return findParentOf(tree.a, target) || findParentOf(tree.b, target);
+}
+
+function rightmostLeaf(tree) {
+  if (!tree) return null;
+  if (tree.type === 'leaf') return tree;
+  return rightmostLeaf(tree.b) || rightmostLeaf(tree.a);
+}
+
+function hasDescendant(node, target) {
+  if (!node || node.type === 'leaf') return node === target;
+  return hasDescendant(node.a, target) || hasDescendant(node.b, target);
+}
+
+// Layout
+function applyLayout() {
+  var cur = ws();
+  if (!cur.tree) return;
+  var rootEl = document.getElementById('ws-' + STATE.activeWorkspace);
+  var w = rootEl.clientWidth, h = rootEl.clientHeight;
+  if (!w || !h) { requestAnimationFrame(applyLayout); return; }
+  layoutTree(cur.tree, { x: 0, y: 0, w: w, h: h });
+  setTimeout(function() {
+    cur.windows.forEach(function(win) {
+      if (win.type === 'terminal' && win.fitAddon) {
+        try { win.fitAddon.fit(); } catch(e) {}
+        if (win.term && win.socket && win.socket.readyState === WebSocket.OPEN) {
+          win.socket.send(JSON.stringify({ type: 'resize', cols: win.term.cols, rows: win.term.rows }));
+        }
+      }
+    });
+  }, 0);
+}
+
+function layoutTree(node, rect) {
+  if (!node) return;
+  if (node.type === 'leaf') {
+    var win = node.win;
+    if (win && win.container) {
+      win.container.style.left   = rect.x + 'px';
+      win.container.style.top    = rect.y + 'px';
+      win.container.style.width  = rect.w + 'px';
+      win.container.style.height = rect.h + 'px';
+    }
+    return;
+  }
+  var r = node.ratio / 100;
+  if (node.dir === 'v') {
+    var aW = Math.round(rect.w * r);
+    layoutTree(node.a, { x: rect.x, y: rect.y, w: aW, h: rect.h });
+    layoutTree(node.b, { x: rect.x + aW, y: rect.y, w: rect.w - aW, h: rect.h });
+  } else {
+    var aH = Math.round(rect.h * r);
+    layoutTree(node.a, { x: rect.x, y: rect.y, w: rect.w, h: aH });
+    layoutTree(node.b, { x: rect.x, y: rect.y + aH, w: rect.w, h: rect.h - aH });
+  }
+}
+
+function unfocusAll() { ws().windows.forEach(function(w) { w.container.classList.remove('focused'); }); }
+
+function focusWindow(id) {
+  unfocusAll();
+  var win = ws().windows.find(function(w) { return w.id === id; });
+  if (!win) return;
+  win.container.classList.add('focused');
+  ws().activeId = id;
+  if (win.type === 'editor' && win.cm) win.cm.focus();
+  if (win.type === 'terminal' && win.term) win.term.focus();
+}
+
+function closeWindow(force) {
+  var win = ws().windows.find(function(w) { return w.id === ws().activeId; });
+  if (!win) return;
+  if (win.type === 'editor' && win.dirty && !force && !confirm('Unsaved changes. Close?')) return;
+  removeWindow(win);
+}
+
+function removeWindow(win) {
+  var cur = ws();
+  if (win.type === 'terminal' && win.socket) win.socket.close();
+  win.container.remove();
+  var leaf = findLeafNode(cur.tree, win.id);
+  if (leaf) {
+    var parent = findParentOf(cur.tree, leaf);
+    if (parent) {
+      replaceNodeInTree(cur.tree, parent, parent.a === leaf ? parent.b : parent.a);
+    } else {
+      cur.tree = null;
+    }
+  }
+  cur.windows = cur.windows.filter(function(w) { return w.id !== win.id; });
+  if (cur.windows.length === 0) { cur.activeId = null; applyLayout(); return; }
+  cur.activeId = cur.windows[cur.windows.length - 1].id;
+  var active = cur.windows.find(function(w) { return w.id === cur.activeId; });
+  if (active) active.container.classList.add('focused');
+  applyLayout();
+}
+
+function resizeWindow(win, delta) {
+  if (!win) return;
+  var leaf = findLeafNode(ws().tree, win.id);
+  if (!leaf) return;
+  var parent = findParentOf(ws().tree, leaf);
+  if (!parent || parent.type !== 'split') return;
+  var isA = parent.a === leaf || hasDescendant(parent.a, leaf);
+  parent.ratio = Math.max(5, Math.min(95, Math.round(parent.ratio + (isA ? delta : -delta))));
+  applyLayout();
+}
+
+function navFocus(dir) {
+  var windows = ws().windows;
+  if (windows.length <= 1) return;
+  var idx = windows.findIndex(function(w) { return w.id === ws().activeId; });
+  if (idx < 0) return;
+  focusWindow(windows[(idx + dir + windows.length) % windows.length].id);
+}
+
+// Window content
+function initWindowContent(win) {
+  var body = win.container.querySelector('.window-body');
+  if (win.type === 'editor') {
+    initEditor(win, body);
+    if (win.filePath) loadFileIntoEditor(win);
+  } else {
+    initTerminal(win, body);
+    connectTerminal(win);
+  }
+}
+
+function initEditor(win, body) {
+  win.cm = CodeMirror(body, {
+    value: '',
+    mode: LANG_MAP[(win.filePath || '').split('.').pop().toLowerCase()] || null,
+    theme: STATE.theme === 'dark' ? 'material-darker' : 'default',
+    lineNumbers: true, autoCloseBrackets: true, styleActiveLine: true,
+    matchBrackets: true, indentUnit: 4, tabSize: 4, viewportMargin: Infinity,
+  });
+  win.cm.on('change', function() {
+    if (!win.dirty) { win.dirty = true; setDirty(win, true); }
+  });
+}
+
+function initTerminal(win, body) {
+  var el = document.createElement('div');
+  el.style.cssText = 'width:100%;height:100%';
+  body.appendChild(el);
+  var fs = STATE.fontSize || 14;
+  win.term = new Terminal({
+    fontSize: fs,
+    fontFamily: "'" + STATE.fontFamily + "', monospace",
+    theme: STATE.theme === 'dark'
+      ? { background: '#0a0a0a', foreground: '#c0c0c0' }
+      : { background: '#f5f5f5', foreground: '#111' },
+    cursorBlink: true, allowProposedApi: true,
+    cols: Math.floor(body.clientWidth / (fs * 0.6)) || 80,
+    rows: Math.floor(body.clientHeight / (fs * 1.3)) || 24,
+  });
+  win.fitAddon = new FitAddon.FitAddon();
+  win.term.loadAddon(win.fitAddon);
+  win.term.open(el);
+  win.fitAddon.fit();
+}
+
+function setDirty(win, on) {
+  var el = win.container.querySelector('.dirty');
+  if (el) el.style.display = on ? 'inline' : 'none';
+}
+
+function loadFileIntoEditor(win) {
+  function setContent(text) {
+    win.cm.setValue(text);
+    win.dirty = false; setDirty(win, false);
+  }
+  if (win.filePath === CONFIG_PATH) {
+    fetch(CFG).then(function(r) { return r.json(); }).then(function(cfg) {
+      setContent(JSON.stringify(cfg, null, 2));
+    }).catch(function(e) { notify('Load failed: ' + e.message); });
+  } else {
+    davGet(win.filePath, setContent, function(e) { notify('Load failed: ' + e.message); });
+  }
+}
+
+function saveEditor(win) {
+  if (!win || win.type !== 'editor') return;
+  var content = win.cm.getValue();
+  function markSaved() { win.dirty = false; setDirty(win, false); notify('Saved'); }
+  if (win.filePath === CONFIG_PATH) {
+    try {
+      var payload = JSON.parse(content);
+      fetch(CFG, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(function(r) { return r.json(); }).then(function(cfg) {
+          if (cfg.theme && cfg.theme !== STATE.theme) { STATE.theme = cfg.theme; applyTheme(); }
+          if (cfg.font_family) STATE.fontFamily = cfg.font_family;
+          if (cfg.font_size) STATE.fontSize = cfg.font_size;
+          markSaved();
+        }).catch(function() { notify('Save failed'); });
+    } catch(e) { notify('Invalid JSON'); }
+  } else {
+    davPut(win.filePath, content, markSaved, function() { notify('Save failed'); });
+  }
+}
+
+function reloadEditor(win) {
+  if (win && win.type === 'editor') loadFileIntoEditor(win);
+}
+
+// Terminal
+function connectTerminal(win) {
+  fetch(WS_URL).then(function(r) {
+    var socket = new WebSocket(r.url.replace(/^http/, 'ws'));
+    win.socket = socket;
+    socket.onopen = function() { updateTermSize(win); };
+    socket.onmessage = function(e) {
+      var msg = JSON.parse(e.data);
+      if (msg.type === 'output') { win.term.write(atob(msg.data)); }
+      else if (msg.type === 'title') {
+        win.title = msg.text;
+        var t = win.container.querySelector('.title-text');
+        if (t) t.textContent = msg.text;
+      } else if (msg.type === 'exit') { removeWindow(win); }
+    };
+    win.term.onData(function(data) {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'input', data: btoa(data) }));
+      }
+    });
+  });
+}
+
+function updateTermSize(win) {
+  try { win.fitAddon.fit(); } catch(e) {}
+  if (win.term && win.socket && win.socket.readyState === WebSocket.OPEN) {
+    win.socket.send(JSON.stringify({ type: 'resize', cols: win.term.cols, rows: win.term.rows }));
+  }
+}
+
+// File picker
+function openFilePicker() {
+  STATE.modalDir = '/'; STATE.modalSelectedFile = null;
+  $('#modal-filename').value = '';
+  loadModalTree();
+  $('#modal-overlay').classList.add('active');
+  $('#modal-filename').focus();
+}
+function closeFilePicker() { $('#modal-overlay').classList.remove('active'); }
+
+function loadModalTree() {
+  davPropfind(STATE.modalDir, function(items) {
+    var dirs = items.filter(function(i) { return i.isDir; }).sort(function(a, b) { return a.name.localeCompare(b.name); });
+    var files = items.filter(function(i) { return !i.isDir; }).sort(function(a, b) { return a.name.localeCompare(b.name); });
+    var treeEl = $('#modal-tree'); treeEl.innerHTML = '';
+    if (STATE.modalDir !== '/') {
+      var parentItem = document.createElement('div');
+      parentItem.className = 'tree-item dir'; parentItem.textContent = '..';
+      parentItem.onclick = function() {
+        STATE.modalDir = STATE.modalDir.split('/').slice(0, -2).join('/') + '/';
+        if (!STATE.modalDir) STATE.modalDir = '/';
+        loadModalTree();
+      };
+      treeEl.appendChild(parentItem);
+    }
+    dirs.forEach(function(d) {
+      var el = document.createElement('div');
+      el.className = 'tree-item dir' + (STATE.modalSelectedDir === d.path ? ' selected' : '');
+      el.textContent = d.name + '/';
+      el.onclick = function() { STATE.modalDir = d.path; STATE.modalSelectedDir = d.path; loadModalTree(); };
+      treeEl.appendChild(el);
+    });
+    var filesEl = $('#modal-files'); filesEl.innerHTML = '';
+    files.forEach(function(f) {
+      var el = document.createElement('div');
+      el.className = 'file-item' + (STATE.modalSelectedFile === f.path ? ' selected' : '');
+      el.textContent = f.name;
+      el.onclick = function() {
+        STATE.modalSelectedFile = f.path;
+        $('#modal-filename').value = f.name;
+        filesEl.querySelectorAll('.file-item').forEach(function(e) { e.classList.remove('selected'); });
+        el.classList.add('selected');
+      };
+      el.ondblclick = function() { STATE.modalSelectedFile = f.path; confirmFileOpen(); };
+      filesEl.appendChild(el);
+    });
+  }, function() { notify('List failed'); });
+}
+
+function confirmFileOpen() {
+  var filename = $('#modal-filename').value.trim();
+  var path = STATE.modalSelectedFile;
+  if (!path && filename) {
+    path = (STATE.modalDir.endsWith('/') ? STATE.modalDir : STATE.modalDir + '/') + filename;
+  }
+  if (!path) return;
+  closeFilePicker();
+  var existing = ws().windows.find(function(w) { return w.filePath === path; });
+  if (existing) { focusWindow(existing.id); return; }
+  addWindowToTiling(createWindow('editor', { filePath: path, title: path }));
+}
+
+$('#modal-open').onclick = confirmFileOpen;
+$('#modal-cancel').onclick = closeFilePicker;
+$('#modal-overlay').onclick = function(e) { if (e.target === $('#modal-overlay')) closeFilePicker(); };
+$('#modal-filename').onkeydown = function(e) {
+  if (e.key === 'Enter') confirmFileOpen();
+  if (e.key === 'Escape') closeFilePicker();
+};
+
+// Keyboard
+document.addEventListener('keydown', function(e) {
+  if (!e.altKey) return;
+  var cur = ws();
+  var active = cur.windows.find(function(w) { return w.id === cur.activeId; });
+  function prevent() { e.preventDefault(); e.stopImmediatePropagation(); }
+  switch (e.key.toLowerCase()) {
+    case 'b': prevent(); openFilePicker(); break;
+    case 'n': prevent(); addWindowToTiling(createWindow('terminal')); break;
+    case 'w': prevent(); closeWindow(); break;
+    case 's': prevent(); if (active && active.type === 'editor') saveEditor(active); break;
+    case 'r': prevent(); if (active && active.type === 'editor') reloadEditor(active); break;
+    case '=': prevent(); resizeWindow(active, 10); break;
+    case '-': prevent(); resizeWindow(active, -10); break;
+    case '1': case '2': case '3': case '4': prevent(); switchWorkspace(parseInt(e.key) - 1); break;
+    case 'arrowup': prevent(); navFocus(-1); break;
+    case 'arrowdown': prevent(); navFocus(1); break;
+    case 'arrowleft': prevent(); navFocus(-1); break;
+    case 'arrowright': prevent(); navFocus(1); break;
+  }
+}, { capture: true });
+
+// Click focus
+document.addEventListener('click', function(e) {
+  var titleEl = e.target.closest('.window-title');
+  if (titleEl) { focusWindow(titleEl.parentElement.id); return; }
+  var bodyEl = e.target.closest('.window-body');
+  if (bodyEl) focusWindow(bodyEl.parentElement.id);
+});
+
+// Init
+function init() {
+  initWorkspaces();
+  renderStatusBar();
+  loadConfig();
+  fetch('/api/serverinfo').then(function(r) { return r.json(); }).then(function(info) {
+    var addrs = info.addrs && info.addrs.length > 0 ? info.addrs.join(', ') : 'no addr';
+    $('#connection-status').textContent = info.hostname + ' (' + addrs + ')';
+  }).catch(function() {
+    $('#connection-status').textContent = location.host;
+  });
+  window.addEventListener('resize', function() { applyLayout(); });
+}
+init();
+</script>
+</body>
+</html>
