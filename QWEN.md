@@ -19,8 +19,8 @@ src/
 │   ├── terminal.go      # /ws/terminal (302 redirect + WS upgrade + PTY)
 │   └── webdav.go        # WebDAV handler (golang.org/x/net/webdav)
 └── pty/
-    ├── pty.go           # PTY 封装 (creack/pty)
-    └── manager.go       # UUID → PTY 生命周期管理
+    ├── pty.go           # PTY 封装 (creack/pty), New / NewWithSize
+    └── manager.go       # UUID → PTY 生命周期, Create / CreateWithSize
 ```
 
 ## CLI
@@ -82,6 +82,8 @@ PROPFIND / GET / PUT / DELETE / MKCOL / MOVE / COPY / LOCK / UNLOCK / OPTIONS
 | `GET /ws/terminal?uuid=<uuid>` | WS upgrade (带 Upgrade header 时) |
 
 WS 协议: `input` / `resize` / `output` / `exit` / `title`
+
+PTY 在收到首个 `resize` 消息后才创建，确保 shell 以正确尺寸启动，避免多余换行。
 
 ### 认证
 
