@@ -86,33 +86,36 @@ body {
 .modal-overlay.active { display: flex; }
 .modal {
   background: var(--modal-bg); border: 1px solid var(--border);
-  width: 620px; height: 440px; display: flex; flex-direction: column;
+  width: 680px; height: 480px; display: flex; flex-direction: column;
 }
 .modal-header {
-  padding: 6px 10px; font-weight: bold;
+  padding: 8px 12px; font-weight: bold; font-size: 13px;
   border-bottom: 1px solid var(--border); background: var(--title-bg);
 }
 .modal-body { display: flex; flex: 1; overflow: hidden; }
-.modal-left { width: 200px; border-right: 1px solid var(--border); overflow-y: auto; }
+.modal-left { width: 220px; border-right: 1px solid var(--border); overflow-y: auto; }
 .modal-right { flex: 1; display: flex; flex-direction: column; }
 .modal-right-files { flex: 1; overflow-y: auto; }
 .modal-right-bottom {
-  border-top: 1px solid var(--border); padding: 6px; display: flex;
-  flex-direction: column; gap: 4px;
+  border-top: 1px solid var(--border); padding: 8px 10px; display: flex;
+  flex-direction: column; gap: 6px;
 }
 .modal-right-bottom input {
-  width: 100%; padding: 3px 6px; background: var(--input-bg);
+  width: 100%; padding: 4px 8px; background: var(--input-bg);
   color: var(--fg); border: 1px solid var(--border); font: inherit;
 }
-.modal-right-bottom .btns { display: flex; gap: 4px; justify-content: flex-end; }
+.modal-right-bottom .btns { display: flex; gap: 6px; justify-content: flex-end; }
 .modal-right-bottom button {
-  padding: 2px 12px; border: 1px solid var(--border); cursor: pointer;
-  font: inherit; color: var(--focus); background: var(--title-bg);
+  padding: 4px 16px; border: 1px solid var(--border); cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--fg); background: var(--title-bg);
 }
-.modal-right-bottom button:hover { background: var(--ws-inactive-bg); }
+.modal-right-bottom button:last-child {
+  background: var(--focus); color: #fff; border-color: var(--focus);
+}
+.modal-right-bottom button:hover { opacity: 0.85; }
 
 .tree-item, .file-item {
-  padding: 2px 10px; cursor: pointer;
+  padding: 3px 12px; cursor: pointer; font-size: 13px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tree-item:hover, .file-item:hover { background: var(--focus); color: #fff; }
@@ -141,17 +144,17 @@ body {
 <div id="main"></div>
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
-    <div class="modal-header">Open File</div>
+    <div class="modal-header">OPEN FILE</div>
     <div class="modal-body">
       <div class="modal-left" id="modal-tree"></div>
       <div class="modal-right">
         <div class="modal-right-files" id="modal-files"></div>
         <div class="modal-right-bottom">
-          <span>Filename:</span>
+          <span>FILENAME</span>
           <input type="text" id="modal-filename">
           <div class="btns">
-            <button id="modal-cancel">Cancel</button>
-            <button id="modal-open">Open</button>
+            <button id="modal-cancel">CANCEL</button>
+            <button id="modal-open">OPEN</button>
           </div>
         </div>
       </div>

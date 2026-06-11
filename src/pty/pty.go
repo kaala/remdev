@@ -19,8 +19,13 @@ type Terminal struct {
 	done  chan struct{}
 }
 
-// New creates a new PTY terminal with the given UUID.
+// New creates a new PTY terminal with the given UUID and default size 80x24.
 func New(id string) (*Terminal, error) {
+	return NewWithSize(id, 80, 24)
+}
+
+// NewWithSize creates a new PTY terminal with the given UUID and dimensions.
+func NewWithSize(id string, cols, rows int) (*Terminal, error) {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "bash"
@@ -29,7 +34,7 @@ func New(id string) (*Terminal, error) {
 	cmd := exec.Command(shell)
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: 80, Rows: 24})
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 	if err != nil {
 		return nil, fmt.Errorf("start pty: %w", err)
 	}

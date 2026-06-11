@@ -62,7 +62,14 @@ func (h *TerminalHandler) handleWS(w http.ResponseWriter, r *http.Request, id st
 	}
 	defer conn.Close()
 
-	term, err := h.manager.Create(id)
+	// Wait for the first resize message before creating the PTY,
+	// so the shell starts with the correct terminal dimensions.
+	cols, rows := waitForResize(conn)
+	if cols == 0 {
+		cols, rows = 80, 24
+	}
+
+	term, err := h.manager.CreateWithSize(id, cols, rows)
 	if err != nil {
 		sendMsg(conn, wsMsg{Type: "error", Text: err.Error()})
 		return
@@ -127,6 +134,22 @@ func (h *TerminalHandler) handleWS(w http.ResponseWriter, r *http.Request, id st
 
 	code := term.Wait()
 	sendMsg(conn, wsMsg{Type: "exit", Code: code})
+}
+
+func waitForResize(conn *websocket.Conn) (cols, rows int) {
+	for {
+		_, msgBytes, err := conn.ReadMessage()
+		if err != nil {
+			return 0, 0
+		}
+		var msg wsMsg
+		if err := json.Unmarshal(msgBytes, &msg); err != nil {
+			continue
+		}
+		if msg.Type == "resize" && msg.Cols > 0 && msg.Rows > 0 {
+			return msg.Cols, msg.Rows
+		}
+	}
 }
 
 func sendMsg(conn *websocket.Conn, msg wsMsg) error {

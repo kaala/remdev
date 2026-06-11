@@ -18,8 +18,13 @@ func NewManager() *Manager {
 	}
 }
 
-// Create creates a new PTY terminal with the given UUID.
+// Create creates a new PTY terminal with the given UUID and default size.
 func (m *Manager) Create(id string) (*Terminal, error) {
+	return m.CreateWithSize(id, 80, 24)
+}
+
+// CreateWithSize creates a new PTY terminal with the given UUID and dimensions.
+func (m *Manager) CreateWithSize(id string, cols, rows int) (*Terminal, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -27,7 +32,7 @@ func (m *Manager) Create(id string) (*Terminal, error) {
 		return nil, fmt.Errorf("terminal %s already exists", id)
 	}
 
-	t, err := New(id)
+	t, err := NewWithSize(id, cols, rows)
 	if err != nil {
 		return nil, err
 	}
