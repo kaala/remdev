@@ -10,7 +10,7 @@ src/
 ├── main.go              # 入口: CLI 解析, 启动 HTTP 服务
 ├── go.mod / go.sum
 ├── config/
-│   └── config.go        # CLI 参数解析 (--root, --port, --host, --option)
+│   └── config.go        # CLI 参数解析 (--root, --port, --host, --token)
 ├── embed/
 │   └── index.html       # 单文件前端 (go:embed)
 ├── handler/
@@ -26,7 +26,7 @@ src/
 ## CLI
 
 ```
-remdev --root /path [--port 7000] [--host 0.0.0.0] [--option key=value]...
+remdev --root /path [--port 7000] [--host 0.0.0.0] [--token <token>]
 ```
 
 | 参数 | 默认值 | 说明 |
@@ -34,7 +34,7 @@ remdev --root /path [--port 7000] [--host 0.0.0.0] [--option key=value]...
 | `--root` | *(必需)* | 文件服务根目录 |
 | `--port` | `7000` | 监听端口 |
 | `--host` | `0.0.0.0` | 监听地址 |
-| `--option k=v` | - | 覆盖配置 (支持: port, host, token) |
+| `--token` | - | Bearer token 认证 (空则跳过) |
 
 所有参数仅通过 CLI 指定，无配置文件。
 

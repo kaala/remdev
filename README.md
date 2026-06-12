@@ -25,11 +25,10 @@ remdev --root /path/to/project
 remdev --root /path [flags]
 
 Flags:
-  --config    path to config file (default: ~/.config/remdev/remdev.json)
-  --root      file serving root directory (required)
-  --port      listen port (default: 7000)
-  --host      listen address (default: 0.0.0.0)
-  --option k=v  override config values (repeatable)
+  --root    file serving root directory (required)
+  --port    listen port (default: 7000)
+  --host    listen address (default: 0.0.0.0)
+  --token   bearer token for authentication (default: none)
 ```
 
 ## Keyboard Shortcuts
