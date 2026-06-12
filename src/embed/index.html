@@ -209,6 +209,7 @@ var DAV = '/dav';
 var CFG_KEY = 'rdev_config';
 var CONFIG_PATH = '__rdev_config__';
 var WS_URL = (location.protocol === 'https:' ? 'https://' : 'http://') + location.host + '/ws/terminal';
+var utf8Decoder = new TextDecoder('utf-8');
 
 var LANG_MAP = {
   js: 'javascript', ts: 'javascript', jsx: 'javascript', tsx: 'javascript',
@@ -649,7 +650,7 @@ function b64Decode(b64) {
   var bin = atob(b64);
   var bytes = new Uint8Array(bin.length);
   for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder('utf-8').decode(bytes);
+  return utf8Decoder.decode(bytes, { stream: true });
 }
 
 function connectTerminal(win) {
