@@ -7,8 +7,9 @@ import (
 
 // Manager manages multiple PTY terminals by UUID.
 type Manager struct {
-	mu     sync.Mutex
-	terms  map[string]*Terminal
+	mu      sync.Mutex
+	terms   map[string]*Terminal
+	WorkDir string // working directory for new terminals (empty = inherit)
 }
 
 // NewManager creates a new Manager.
@@ -32,7 +33,7 @@ func (m *Manager) CreateWithSize(id string, cols, rows int) (*Terminal, error) {
 		return nil, fmt.Errorf("terminal %s already exists", id)
 	}
 
-	t, err := NewWithSize(id, cols, rows)
+	t, err := NewWithSize(id, cols, rows, m.WorkDir)
 	if err != nil {
 		return nil, err
 	}

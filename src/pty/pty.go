@@ -19,20 +19,25 @@ type Terminal struct {
 	done  chan struct{}
 }
 
-// New creates a new PTY terminal with the given UUID and default size 80x24.
-func New(id string) (*Terminal, error) {
-	return NewWithSize(id, 80, 24)
+// New creates a new PTY terminal with the given UUID, default size 80x24,
+// and optional working directory.
+func New(id string, workDir string) (*Terminal, error) {
+	return NewWithSize(id, 80, 24, workDir)
 }
 
-// NewWithSize creates a new PTY terminal with the given UUID and dimensions.
-func NewWithSize(id string, cols, rows int) (*Terminal, error) {
+// NewWithSize creates a new PTY terminal with the given UUID, dimensions,
+// and optional working directory (empty means inherit from parent process).
+func NewWithSize(id string, cols, rows int, workDir string) (*Terminal, error) {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "bash"
 	}
 
-	cmd := exec.Command(shell)
+	cmd := exec.Command(shell, "-l")
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
 	if err != nil {

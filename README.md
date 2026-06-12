@@ -16,7 +16,7 @@ remdev --root /path/to/project
 - **Editor** — CodeMirror 5 with syntax highlighting for 12 languages, Alt+B to open files
 - **Workspaces** — 4 independent workspace groups, Alt+1-4 to switch
 - **WebDAV** — standard DAV server at `/dav/`, mountable by any DAV client
-- **Config editor** — edit `remdev.json` in-browser, theme/font changes apply live
+- **Config editor** — edit `rdev.json` in-browser, theme/font changes apply live
 - **Single binary** — static builds for Linux/macOS/Windows × amd64/arm64
 
 ## Usage
@@ -38,6 +38,7 @@ Flags:
 |---|---|
 | Alt+N | New terminal |
 | Alt+B | Open file picker |
+| Alt+, | Open config editor |
 | Alt+W | Close window |
 | Alt+S | Save file |
 | Alt+R | Reload file |
