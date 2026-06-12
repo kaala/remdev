@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-GO := bin/vendor/go/bin/go
+GO := go
 SRC := src
 DIST := dist
 
