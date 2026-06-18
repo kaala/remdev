@@ -48,7 +48,7 @@ body {
 /* ── Status bar ── */
 #status-bar {
   display: flex; align-items: center; height: 32px; flex-shrink: 0;
-  padding: 0 14px; gap: 14px; font-size: 11px; color: var(--text-muted);
+  padding: 0 14px; gap: 14px; font-size: 11px; color: var(--text);
 }
 #hostname { flex: 1; letter-spacing: .2px; }
 
@@ -64,6 +64,23 @@ body {
 #main { flex: 1; position: relative; overflow: hidden; }
 .workspace { position: absolute; inset: 0; display: none; }
 .workspace.active { display: block; }
+
+/* ── Shortcut hints (shown when no windows) ── */
+#shortcuts {
+  display: none; position: absolute; inset: 0;
+  justify-content: center; align-items: center;
+  font-family: system-ui, sans-serif; color: var(--text-muted);
+  font-size: 13px; line-height: 2; text-align: center;
+  pointer-events: none; user-select: none;
+}
+#shortcuts kbd {
+  font-family: system-ui, sans-serif; font-size: 11px;
+  padding: 1px 6px; border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  margin: 0 2px;
+}
+#shortcuts.visible { display: flex; }
 
 /* ── Window ── */
 .window {
@@ -103,8 +120,8 @@ body {
 /* ── File picker ── */
 dialog {
   background: var(--surface); border: 1px solid var(--border);
-  width: 480px; padding: 0; border-radius: var(--radius);
-  box-shadow: var(--shadow); overflow: hidden;
+  width: 480px; padding: 0; margin: 10vh auto auto auto;
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
   color: var(--text);
 }
 dialog::backdrop { background: var(--overlay); backdrop-filter: blur(6px); }
@@ -153,7 +170,7 @@ dialog input:focus { border-bottom-color: var(--accent); }
   <div id="workspaces"></div>
   <div id="hostname"></div>
 </div>
-<div id="main"></div>
+<div id="main"><div id="shortcuts"></div></div>
 <dialog id="picker">
   <input type="text" id="filename" value="/">
   <div class="dialog-files" id="filelist"></div>
@@ -329,6 +346,23 @@ function switchWorkspace(idx) {
   renderStatusBar();
   applyLayout();
   if (cur.activeId) focusWindow(cur.activeId);
+  updateShortcuts();
+}
+
+function updateShortcuts() {
+  var el = $('#shortcuts');
+  if (ws().windows.length === 0) {
+    el.innerHTML =
+      '<div><kbd>Alt</kbd>+<kbd>N</kbd> new terminal</div>' +
+      '<div><kbd>Alt</kbd>+<kbd>B</kbd> open file</div>' +
+      '<div><kbd>Alt</kbd>+<kbd>1</kbd>–<kbd>0</kbd> workspace</div>' +
+      '<div><kbd>Alt</kbd>+<kbd>W</kbd> close window</div>' +
+      '<div><kbd>Alt</kbd>+<kbd>,</kbd> settings</div>' +
+      '<div><kbd>Alt</kbd>+<kbd>←↑↓→</kbd> navigate</div>';
+    el.classList.add('visible');
+  } else {
+    el.classList.remove('visible');
+  }
 }
 
 // Tiling: binary tree
@@ -370,6 +404,7 @@ function addWindowToTiling(win) {
   unfocusAll();
   win.container.classList.add('focused');
   applyLayout();
+  updateShortcuts();
   setTimeout(function() { initWindowContent(win); }, 30);
 }
 
@@ -490,11 +525,12 @@ function removeWindow(win) {
     }
   }
   cur.windows = cur.windows.filter(function(w) { return w.id !== win.id; });
-  if (cur.windows.length === 0) { cur.activeId = null; applyLayout(); return; }
+  if (cur.windows.length === 0) { cur.activeId = null; applyLayout(); updateShortcuts(); return; }
   cur.activeId = cur.windows[cur.windows.length - 1].id;
   var active = cur.windows.find(function(w) { return w.id === cur.activeId; });
   if (active) active.container.classList.add('focused');
   applyLayout();
+  updateShortcuts();
 }
 
 function resizeWindow(win, delta) {
@@ -912,6 +948,7 @@ document.addEventListener('click', function(e) {
 function init() {
   initWorkspaces();
   renderStatusBar();
+  updateShortcuts();
   loadConfig();
   fetch('/api/info').then(function(r) { return r.json(); }).then(function(info) {
     var addrs = info.addrs && info.addrs.length > 0 ? info.addrs.join(', ') : 'no addr';
