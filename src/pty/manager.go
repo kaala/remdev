@@ -19,11 +19,6 @@ func NewManager() *Manager {
 	}
 }
 
-// Create creates a new PTY terminal with the given UUID and default size.
-func (m *Manager) Create(id string) (*Terminal, error) {
-	return m.CreateWithSize(id, 80, 24)
-}
-
 // CreateWithSize creates a new PTY terminal with the given UUID and dimensions.
 func (m *Manager) CreateWithSize(id string, cols, rows int) (*Terminal, error) {
 	m.mu.Lock()
@@ -42,13 +37,6 @@ func (m *Manager) CreateWithSize(id string, cols, rows int) (*Terminal, error) {
 	return t, nil
 }
 
-// Get returns the terminal with the given UUID.
-func (m *Manager) Get(id string) *Terminal {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.terms[id]
-}
-
 // Remove removes a terminal from the manager and closes it.
 func (m *Manager) Remove(id string) {
 	m.mu.Lock()
@@ -57,11 +45,4 @@ func (m *Manager) Remove(id string) {
 		t.Close()
 		delete(m.terms, id)
 	}
-}
-
-// Count returns the number of active terminals.
-func (m *Manager) Count() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.terms)
 }

@@ -42,6 +42,8 @@ func ServerInfoHandler() http.Handler {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(info)
+		if err := json.NewEncoder(w).Encode(info); err != nil {
+			http.Error(w, "encode error", http.StatusInternalServerError)
+		}
 	})
 }

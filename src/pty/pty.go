@@ -16,13 +16,6 @@ type Terminal struct {
 	ptmx  *os.File
 	title string
 	mu    sync.Mutex
-	done  chan struct{}
-}
-
-// New creates a new PTY terminal with the given UUID, default size 80x24,
-// and optional working directory.
-func New(id string, workDir string) (*Terminal, error) {
-	return NewWithSize(id, 80, 24, workDir)
 }
 
 // NewWithSize creates a new PTY terminal with the given UUID, dimensions,
@@ -49,7 +42,6 @@ func NewWithSize(id string, cols, rows int, workDir string) (*Terminal, error) {
 		cmd:   cmd,
 		ptmx:  ptmx,
 		title: shell,
-		done:  make(chan struct{}),
 	}
 
 	return t, nil
@@ -80,7 +72,6 @@ func (t *Terminal) SetTitle(title string) {
 func (t *Terminal) Wait() int {
 	err := t.cmd.Wait()
 	t.ptmx.Close()
-	close(t.done)
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return exitErr.ExitCode()
@@ -89,8 +80,6 @@ func (t *Terminal) Wait() int {
 	}
 	return 0
 }
-
-func (t *Terminal) Done() <-chan struct{} { return t.done }
 
 func (t *Terminal) Kill() error { return t.cmd.Process.Kill() }
 

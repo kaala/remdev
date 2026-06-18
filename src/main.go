@@ -37,7 +37,10 @@ func main() {
 	mux.Handle("/ws/terminal", auth(terminalHandler))
 	mux.Handle("/ws/terminal/", auth(terminalHandler))
 
-	frontend, _ := embedded.ReadFile("embed/index.html")
+	frontend, err := embedded.ReadFile("embed/index.html")
+	if err != nil {
+		log.Fatalf("embed: %v", err)
+	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")

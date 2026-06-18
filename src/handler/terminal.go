@@ -153,7 +153,10 @@ func waitForResize(conn *websocket.Conn) (cols, rows int) {
 }
 
 func sendMsg(conn *websocket.Conn, msg wsMsg) error {
-	data, _ := json.Marshal(msg)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
 	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
